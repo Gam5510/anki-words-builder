@@ -11,7 +11,10 @@ from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 from typing import Dict, List, Optional
 
-# ====== HTTP-сессия с пулами и ретраями ======
+# ====== Config ======
+OUTPUT_APKG = "english_words1.apkg"  # change this to customize output filename
+
+# ====== HTTP session with pooling and retries ======
 _SESSION = None
 
 def get_http_session():
@@ -26,7 +29,7 @@ def get_http_session():
     _SESSION = session
     return _SESSION
 
-# ====== Перевод через Google Translate ======
+# ====== Translation via Google Translate (public endpoint) ======
 def google_translate(word, target="ru"):
     session = get_http_session()
     url = "https://translate.googleapis.com/translate_a/single"
@@ -41,9 +44,9 @@ def google_translate(word, target="ru"):
     if r.status_code == 200:
         result = r.json()
         return result[0][0][0]
-    return "Перевод не найден"
+    return "Translation not found"
 
-# ====== Примеры: несколько источников и устойчивые парсеры ======
+# ====== Examples: multiple sources with resilient parsing ======
 
 def _example_from_dictionaryapi(word: str) -> Optional[str]:
     try:
@@ -55,7 +58,7 @@ def _example_from_dictionaryapi(word: str) -> Optional[str]:
         data = r.json()
         if not isinstance(data, list) or not data:
             return None
-        # Ищем первое поле example в meanings -> definitions
+        # Find first example in meanings -> definitions
         for entry in data:
             for meaning in entry.get("meanings", []):
                 for definition in meaning.get("definitions", []):
@@ -88,14 +91,12 @@ def _example_from_tatoeba(word: str) -> Optional[str]:
             text_en = item.get("text")
             translations = item.get("translations") or []
             ru_text = None
-            # translations может быть списком объектов или строк
             for tr in translations:
                 if isinstance(tr, dict) and tr.get("language") in ("rus", "ru") and tr.get("text"):
                     ru_text = tr.get("text")
                     break
             if text_en and ru_text:
                 return f"{text_en} — {ru_text}"
-        # Если русских переводов не нашли, вернём англ предложение
         if results:
             first = results[0]
             if first.get("text"):
@@ -111,14 +112,14 @@ def _example_from_reverso(word: str) -> Optional[str]:
         url = f"https://context.reverso.net/translation/english-russian/{word}"
         headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
-            "Accept-Language": "ru,en;q=0.9",
+            "Accept-Language": "en-US,en;q=0.9",
             "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
         }
         r = session.get(url, headers=headers, timeout=10)
         if r.status_code != 200:
             return None
         soup = BeautifulSoup(r.text, "html.parser")
-        # Разные селекторы на случай изменений вёрстки
+        # Multiple selectors in case of layout changes
         candidates = soup.select(".example .text, .example .src, .example .trg, .example.single .example-text")
         for el in candidates:
             txt = el.get_text(strip=True)
@@ -132,28 +133,24 @@ def _example_from_reverso(word: str) -> Optional[str]:
 def get_example(word):
     q = (word or "").strip()
     if not q:
-        return "Пример не найден"
+        return "Example not found"
     q = q.lower()
 
-    # 1) DictionaryAPI (часто отдает качественные примеры на EN)
     ex = _example_from_dictionaryapi(q)
     if ex:
         return ex
 
-    # 2) Tatoeba (пытаемся получить EN — RU пару)
     ex = _example_from_tatoeba(q)
     if ex:
         return ex
 
-    # 3) Reverso как дополнительная попытка
     ex = _example_from_reverso(q)
     if ex:
         return ex
 
-    # 4) Генеративный фолбэк, чтобы карточка не оставалась пустой
     return f"I often use the word '{word}' in daily conversation."
 
-# ====== Аудио через gTTS (кеширование файлов в папке audio/) ======
+# ====== Audio via gTTS (cached in audio/ folder) ======
 AUDIO_DIR = "audio"
 os.makedirs(AUDIO_DIR, exist_ok=True)
 
@@ -166,7 +163,7 @@ def get_audio(word):
         tts.save(audio_path)
     return audio_path
 
-# ====== Создание модели ======
+# ====== Note model ======
 my_model = genanki.Model(
     20251001,
     "EN-RU Vocabulary",
@@ -183,13 +180,13 @@ my_model = genanki.Model(
     }]
 )
 
-# ====== Создание колоды ======
+# ====== Deck ======
 my_deck = genanki.Deck(2059400222, "English Vocabulary")
 media_files = []
 
-# ====== Базы данных ======
+# ====== Local databases ======
 WORDS_DB_PATH = "words_db.json"
-CARDS_DB_PATH = "cards_db.json"  # полные данные по карточкам
+CARDS_DB_PATH = "cards_db.json"  # full per-word data
 
 def load_words_db():
     if os.path.exists(WORDS_DB_PATH):
@@ -223,7 +220,8 @@ def save_cards_db(cards: Dict[str, Dict[str, str]]):
     with open(CARDS_DB_PATH, "w", encoding="utf-8") as f:
         json.dump(cards, f, ensure_ascii=False, indent=2)
 
-# ====== Вспомогательные функции прогресса ======
+# ====== Progress helpers ======
+
 def print_progress(phase: str, done: int, total: int):
     total = max(total, 1)
     percent = int(done * 100 / total)
@@ -234,11 +232,12 @@ def print_progress(phase: str, done: int, total: int):
     print(msg, end="", flush=True)
 
 def finish_progress():
-    print()  # перенос строки после прогресс-бара
+    print()
 
-# ====== Фазы обработки (для новых слов) ======
+# ====== Fetch phases (only for new words) ======
+
 def fetch_translations(words: List[str]) -> Dict[str, str]:
-    print("Ищем переводы…")
+    print("Fetching translations…")
     results: Dict[str, str] = {}
     total = len(words)
     done = 0
@@ -249,14 +248,14 @@ def fetch_translations(words: List[str]) -> Dict[str, str]:
             try:
                 results[w] = future.result()
             except Exception:
-                results[w] = "Перевод не найден"
+                results[w] = "Translation not found"
             done += 1
-            print_progress("Переводы", done, total)
+            print_progress("Translations", done, total)
     finish_progress()
     return results
 
 def fetch_examples(words: List[str]) -> Dict[str, str]:
-    print("Ищем контекст (примеры)…")
+    print("Fetching examples…")
     results: Dict[str, str] = {}
     total = len(words)
     done = 0
@@ -267,14 +266,14 @@ def fetch_examples(words: List[str]) -> Dict[str, str]:
             try:
                 results[w] = future.result()
             except Exception:
-                results[w] = "Пример не найден"
+                results[w] = "Example not found"
             done += 1
-            print_progress("Контекст", done, total)
+            print_progress("Examples", done, total)
     finish_progress()
     return results
 
 def fetch_audios(words: List[str]) -> Dict[str, str]:
-    print("Готовим аудио…")
+    print("Generating audio…")
     results: Dict[str, str] = {}
     total = len(words)
     done = 0
@@ -288,50 +287,44 @@ def fetch_audios(words: List[str]) -> Dict[str, str]:
                 audio_path = os.path.join(AUDIO_DIR, f"{w}.mp3")
             results[w] = audio_path
             done += 1
-            print_progress("Аудио", done, total)
+            print_progress("Audio", done, total)
     finish_progress()
     return results
 
-# ====== Основной цикл ======
+# ====== Main ======
 try:
-    print("Вставьте слова (через запятую или с новой строки). Завершите ввод: Ctrl+Z затем Enter (Windows) / Ctrl+D (Linux/macOS):")
+    print("Paste words (comma- or newline-separated). Finish: Ctrl+Z then Enter (Windows) / Ctrl+D (Linux/macOS):")
     text = sys.stdin.read()
 except KeyboardInterrupt:
-    print("\nВвод прерван. Выход без ошибок.")
+    print("\nInput aborted. Exiting gracefully.")
     sys.exit(0)
 
 if not text.strip():
-    # Фолбэк: одна строка ввода через input()
     try:
-        print("Введите слова через запятую или пробел:")
+        print("Enter words separated by comma or space:")
         text = input()
     except KeyboardInterrupt:
-        print("\nВвод прерван. Выход без ошибок.")
+        print("\nInput aborted. Exiting gracefully.")
         sys.exit(0)
 
-# Разбиваем по запятым/точкам с запятой/переводам строк/табам
 raw_items = re.split(r"[\n\r,;\t]+", text)
 stdin_words = [item.strip() for item in raw_items if item.strip()]
 
-# Загружаем БД
 known_words = load_words_db()
 cards_db = load_cards_db()
 
-# Определяем новые слова
 new_words = []
 for candidate in stdin_words:
     normalized = candidate.strip()
     if normalized and normalized not in known_words and normalized not in new_words:
         new_words.append(normalized)
 
-apkg_path = "english_words.apkg"
+apkg_path = OUTPUT_APKG
 
-# Если нет новых слов и пакет отсутствует — пересобираем из всей БД без повторных сетевых запросов (используем cards_db)
 if not new_words and not os.path.exists(apkg_path):
-    print("Новых слов нет, пакет отсутствует — пересобираем из БД…")
+    print("No new words, package missing — rebuilding from local DB…")
     words_to_build = sorted(known_words)
 else:
-    # Добавляем новые слова в БД и получаем данные ТОЛЬКО по ним
     if new_words:
         for w in new_words:
             known_words.add(w)
@@ -343,36 +336,32 @@ else:
             examples = fetch_examples(words_to_fetch)
             audios = fetch_audios(words_to_fetch)
         except KeyboardInterrupt:
-            print("\nОперация прервана пользователем. Выход без ошибок.")
+            print("\nOperation cancelled by user. Exiting gracefully.")
             sys.exit(0)
-        # Сохраняем полные карточные данные по новым словам в cards_db
         for w in words_to_fetch:
             audio_path = audios.get(w, os.path.join(AUDIO_DIR, f"{w}.mp3"))
             cards_db[w] = {
-                "translation": translations.get(w, "Перевод не найден"),
-                "example": examples.get(w, "Пример не найден"),
+                "translation": translations.get(w, "Translation not found"),
+                "example": examples.get(w, "Example not found"),
                 "audio_file": os.path.basename(audio_path),
             }
         save_cards_db(cards_db)
-    # Строим колоду из всей БД (все известные слова)
     words_to_build = sorted(known_words)
 
-print("Собираем колоду (все слова из БД)…")
+print("Assembling deck (all words from DB)…")
 for w in words_to_build:
-    # Берём из cards_db если есть, иначе лениво получаем сейчас и сохраняем
     entry = cards_db.get(w)
     if entry is None:
-        # Ленивое наполнение для отсутствующих данных
         try:
             translation = google_translate(w)
             example = get_example(w)
             audio_path = get_audio(w)
         except KeyboardInterrupt:
-            print("\nОперация прервана пользователем. Выход без ошибок.")
+            print("\nOperation cancelled by user. Exiting gracefully.")
             sys.exit(0)
         entry = {
-            "translation": translation or "Перевод не найден",
-            "example": example or "Пример не найден",
+            "translation": translation or "Translation not found",
+            "example": example or "Example not found",
             "audio_file": os.path.basename(audio_path),
         }
         cards_db[w] = entry
@@ -381,14 +370,13 @@ for w in words_to_build:
 
     note = genanki.Note(
         model=my_model,
-        fields=[w, entry.get("translation", "Перевод не найден"), entry.get("example", "Пример не найден"), audio_tag],
+        fields=[w, entry.get("translation", "Translation not found"), entry.get("example", "Example not found"), audio_tag],
         guid=genanki.guid_for(w),
     )
     my_deck.add_note(note)
     if audio_path not in media_files:
         media_files.append(audio_path)
 
-# Сохраняем обновлённый cards_db (на случай ленивых догрузок)
 save_cards_db(cards_db)
 
 try:
@@ -396,10 +384,10 @@ try:
     package.media_files = media_files
     package.write_to_file(apkg_path)
 except KeyboardInterrupt:
-    print("\nСохранение прервано. Выход без ошибок.")
+    print("\nSaving aborted. Exiting gracefully.")
     sys.exit(0)
 
-print("✅ Готово: english_words.apkg создан. Импортируйте в Anki!")
+print(f"✅ Done: {OUTPUT_APKG} created. Import into Anki!")
 
 if new_words:
-    print("Добавлены новые слова:", ", ".join(sorted(new_words)))
+    print("New words added:", ", ".join(sorted(new_words)))
