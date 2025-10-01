@@ -2,7 +2,7 @@
 
 ## Anki Words Builder — создавайте умные словарные колоды для Anki за минуты
 
-[![Python](https://img.shields.io/badge/Python-3.9%2B-blue.svg)](https://www.python.org/) [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE) [![GitHub Stars](https://img.shields.io/badge/stars-★%20на%20GitHub-informational.svg)](https://github.com/Gam5510/anki-words-builder)
+[![Python](https://img.shields.io/badge/Python-3.9%2B-blue.svg)]([https://www.python.org/](https://img.shields.io/badge/python-3.9%2B-blue)) [![License](https://img.shields.io/badge/License-MIT-green.svg)]([LICENSE](https://img.shields.io/github/license/Gam5510/anki-words-builder)) [![GitHub Stars](https://img.shields.io/badge/stars-★%20на%20GitHub-informational.svg)](https://github.com/Gam5510/anki-words-builder](https://img.shields.io/github/stars/Gam5510/anki-words-builder?style=social)
 
 ## Описание
 Anki Words Builder — это утилита на Python для быстрого создания колод Anki из списка английских слов. Скрипт автоматически добавляет перевод, пример использования и озвучку, а также ведёт локальную базу, чтобы не терять карточки между запусками.
@@ -73,3 +73,4 @@ subprocess.run(["python", "anki_creator.py"], check=True)
 
 
 > Лицензия: MIT. Свободно используйте, форкайте и присылайте PR — буду рад вашему вкладу! 🎉 
+
