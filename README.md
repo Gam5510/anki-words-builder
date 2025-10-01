@@ -57,8 +57,9 @@ subprocess.run(["python", "anki_creator.py"], check=True)
 - Integration tests and CI
 
 ## Author / Contact
-- Author: Your Name (@your_handle)
+- Author: Your Name (https://t.me/gam5510)
 - GitHub: https://github.com/Gam5510
-- Email: you@example.com
+- Email: ryvokteam@gmail.com
+
 
 > License: MIT. Feel free to use, fork, and open PRs — contributions welcome! 🎉 
