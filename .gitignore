@@ -1,0 +1,16 @@
+# virtual environment
+.venv/
+
+# Anki artifacts and local data
+english_words.apkg
+audio/
+words_db.json
+cards_db.json
+
+# Python cache
+__pycache__/
+*.pyc
+
+# OS/IDE
+.DS_Store
+Thumbs.db 

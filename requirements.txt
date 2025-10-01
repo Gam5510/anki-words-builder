@@ -1,0 +1,6 @@
+genanki==0.13.0
+beautifulsoup4==4.12.3
+requests==2.32.3
+gTTS==2.5.3
+urllib3==2.2.2
+soupsieve==2.5 
