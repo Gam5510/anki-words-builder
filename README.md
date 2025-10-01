@@ -1,4 +1,4 @@
-![Anki Words Builder](https://ibb.co/2YH4sK6F)
+![Anki Words Builder](https://i.postimg.cc/prg84W0F/2025-10-01-142107.png)
 
 ## Anki Words Builder — создавайте умные словарные колоды для Anki за минуты
 
@@ -70,5 +70,6 @@ subprocess.run(["python", "anki_creator.py"], check=True)
 - Автор: Fazliddin (tg https://t.me/gam5510)
 - GitHub: https://github.com/Gam5510
 - Почта: ryvokteam@gmail.com
+
 
 > Лицензия: MIT. Свободно используйте, форкайте и присылайте PR — буду рад вашему вкладу! 🎉 
